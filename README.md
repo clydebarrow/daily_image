@@ -33,28 +33,22 @@ measurements put red around `#a02020`-`#b21318`, yellow around
 / `#ffff00`). Matching pixels against pure primaries directly, as an earlier
 version of this file did, misclassifies a lot of mid-tone/muted pixels.
 
-`dither.py` now uses two palettes:
+`dither.py`'s `SPECTRA_E6_PALETTE` uses those muted colours directly —
+sourced from a [dithering tool built for this same 13.3" Spectra 6
+panel](https://gist.github.com/quark-zju/e488eb206ba66925dc23692170ba49f9)
+— as both the nearest-colour matching/Floyd-Steinberg target *and* the
+encoded output pixel values. The panel's own ingestion pipeline nearest-
+matches each pixel to a hardware ink channel itself, so there's no need to
+re-encode to pure-primary codes here, and using the real muted values means
+the PNG also previews faithfully on a computer screen.
 
-- `SPECTRA_E6_PERCEPTUAL_PALETTE` — muted colours approximating what the
-  panel actually displays (sourced from a [dithering tool built for this
-  same 13.3" Spectra 6
-  panel](https://gist.github.com/quark-zju/e488eb206ba66925dc23692170ba49f9)).
-  Used for the nearest-colour matching and Floyd-Steinberg error diffusion,
-  so the colour chosen for each pixel is the one the panel will actually
-  reproduce most closely.
-- `SPECTRA_E6_DEVICE_PALETTE` — pure primaries. After matching, pixel
-  indices are re-mapped to these before saving, since panel drivers
-  typically nearest-match each pixel against a hardcoded pure-primary table
-  to pick the hardware ink channel — the *file* needs unambiguous pure
-  codes even though the *decision* was made in muted colour space.
-
-This two-stage approach is the same one used by
-[epdoptimize](https://github.com/Utzel-Butzel/epdoptimize), an e-paper
-dithering library that measured its palette with lab equipment. Since real
-panels vary by batch and viewing light, for best fidelity replace
-`SPECTRA_E6_PERCEPTUAL_PALETTE`'s tuples with values measured from your own
-physical panel; leave `SPECTRA_E6_DEVICE_PALETTE` as pure primaries unless
-your specific driver expects something else.
+A second independent source
+([epdoptimize](https://github.com/Utzel-Butzel/epdoptimize), an e-paper
+dithering library calibrated with lab equipment) measured comparable but
+not identical muted values — panels vary by batch and viewing light, so
+treat the defaults as a good approximation rather than ground truth. For
+best fidelity, replace `SPECTRA_E6_PALETTE`'s tuples with values measured
+from your own physical panel.
 
 ### Why PNG, not JPEG
 
