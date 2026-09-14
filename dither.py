@@ -55,3 +55,15 @@ def dither_to_spectra_e6(image: Image.Image) -> Image.Image:
     return image.convert("RGB").quantize(
         palette=palette_image, dither=Image.Dither.FLOYDSTEINBERG
     )
+
+
+def snap_to_spectra_e6(image: Image.Image) -> Image.Image:
+    """Map an RGB image to the nearest Spectra E6 colours with no dithering.
+
+    For use after drawing directly on an already-dithered image (e.g. a text
+    overlay) -- collapses anti-aliased edge pixels back onto the flat
+    6-colour palette instead of leaving stray intermediate colours in the
+    output.
+    """
+    palette_image = _build_palette_image(SPECTRA_E6_PALETTE)
+    return image.convert("RGB").quantize(palette=palette_image, dither=Image.Dither.NONE)

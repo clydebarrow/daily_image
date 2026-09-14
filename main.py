@@ -10,7 +10,8 @@ import os
 import sys
 from datetime import datetime, timezone
 
-from dither import dither_to_spectra_e6
+from caption import add_attribution
+from dither import dither_to_spectra_e6, snap_to_spectra_e6
 from storage import upload_png
 from unsplash import download_constrained_image, fetch_random_photo, notify_download
 
@@ -45,6 +46,11 @@ def main() -> None:
 
     logger.info("Dithering to Spectra E6 six-colour palette")
     dithered = dither_to_spectra_e6(image)
+
+    photographer = photo.get("user", {}).get("name")
+    if photographer:
+        logger.info("Overlaying attribution for %s", photographer)
+        dithered = snap_to_spectra_e6(add_attribution(dithered, photographer))
 
     logger.info("Uploading to gs://%s/%s", gcs_bucket, object_name)
     public_url = upload_png(gcs_bucket, object_name, dithered)

@@ -19,7 +19,14 @@ for the ~seconds it takes to run) triggered daily by **Cloud Scheduler**.
    whenever an image is downloaded for use.
 2. `dither.py` Floyd-Steinberg dithers the image down to the 6 Spectra E6
    colours using `PIL.Image.quantize(palette=..., dither=FLOYDSTEINBERG)`.
-3. `storage.py` saves the result as a PNG and uploads it to
+3. `caption.py` draws "By {photographer} on Unsplash" in the top-left
+   corner (white text with a thin dark outline for legibility), then
+   `dither.snap_to_spectra_e6` maps the anti-aliased text edges back onto
+   the flat 6-colour palette with no dithering, so the file still only
+   contains those 6 colours. The Unsplash licence doesn't require
+   attribution, but appreciates it, and there's no accompanying webpage to
+   put a link in, so it's burned into the image instead.
+4. `storage.py` saves the result as a PNG and uploads it to
    `gs://$GCS_BUCKET/$OBJECT_NAME` (default `latest.png`), overwriting the
    previous day's image so the public URL stays fixed:
    `https://storage.googleapis.com/$GCS_BUCKET/latest.png`.
