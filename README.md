@@ -217,6 +217,63 @@ This runs the job once a day at 06:00 UTC — adjust `--schedule` /
 `--time-zone` as needed. Cloud Scheduler retries the trigger automatically
 according to its default retry policy if the initial invocation fails.
 
+## Re-running on demand (Home Assistant, curl, etc.)
+
+`trigger/` is a tiny Cloud Run service. `POST /run` with a bearer token
+starts the job through the Cloud Run Jobs API and returns `202`
+immediately; the job itself takes a couple of minutes. It is POST-only, so
+link prefetchers can't trigger it by accident.
+
+```bash
+# one-time setup (token is generated straight into Secret Manager)
+openssl rand -hex 32 | tr -d '\n' | gcloud secrets create daily-image-trigger-token \
+  --replication-policy=automatic --data-file=-
+
+gcloud iam service-accounts create daily-image-trigger \
+  --display-name="daily_image on-demand trigger"
+gcloud secrets add-iam-policy-binding daily-image-trigger-token \
+  --member="serviceAccount:daily-image-trigger@$PROJECT_ID.iam.gserviceaccount.com" \
+  --role=roles/secretmanager.secretAccessor
+gcloud run jobs add-iam-policy-binding "$JOB_NAME" --region="$REGION" \
+  --member="serviceAccount:daily-image-trigger@$PROJECT_ID.iam.gserviceaccount.com" \
+  --role=roles/run.invoker
+
+gcloud builds submit trigger/ \
+  --tag "$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/daily-image-trigger:latest"
+gcloud run deploy daily-image-trigger \
+  --image="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/daily-image-trigger:latest" \
+  --region="$REGION" \
+  --service-account="daily-image-trigger@$PROJECT_ID.iam.gserviceaccount.com" \
+  --set-env-vars="PROJECT_ID=$PROJECT_ID,REGION=$REGION,JOB_NAME=$JOB_NAME" \
+  --set-secrets="TRIGGER_TOKEN=daily-image-trigger-token:latest" \
+  --max-instances=1 --memory=256Mi
+
+# Home Assistant can't present a Google identity, so the service must accept
+# unauthenticated requests -- the bearer token is then the only protection.
+gcloud run services add-iam-policy-binding daily-image-trigger \
+  --region="$REGION" --member=allUsers --role=roles/run.invoker
+```
+
+Read the token back with
+`gcloud secrets versions access latest --secret=daily-image-trigger-token`.
+
+Home Assistant (`configuration.yaml`, with the token in `secrets.yaml` as
+`daily_image_trigger_auth: "Bearer <token>"`):
+
+```yaml
+rest_command:
+  refresh_daily_image:
+    url: "https://daily-image-trigger-708822966235.us-central1.run.app/run"
+    method: post
+    headers:
+      authorization: !secret daily_image_trigger_auth
+    timeout: 30
+```
+
+Then call `rest_command.refresh_daily_image` from an automation, script or
+dashboard button. Or from a shell:
+`curl -X POST -H "Authorization: Bearer $TOKEN" <service-url>/run`.
+
 ## Environment variables
 
 | Variable               | Required | Default      | Purpose                                             |
